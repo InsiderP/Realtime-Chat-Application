@@ -1,26 +1,55 @@
-const { log } = require("console")
-const express =require("express")
-const { Socket } = require("socket.io")
-const app=express()
-const PORT =process.env.PORT||3000
-const http=require("http").createServer(app)
+const express = require("express");
+const app = express();
+const PORT = process.env.PORT || 3000;
+const http = require("http").createServer(app);
 
 
-http.listen(PORT,()=>{
-    console.log(`listening on ${PORT}`)
-})
+app.use(express.json());
 
-app.use(express.static(__dirname+"/public"))
+http.listen(PORT, () => {
+  console.log(`listening on ${PORT}`);
+});
 
-app.get("/",(req,res)=>{
-    res.sendFile(__dirname+"/index.html")
-})
+app.use(express.static(__dirname + "/public"));
 
-const io = require("socket.io")(http)
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/index.html");
+});
 
-io.on("connection",(socket)=>{
-    console.log("connected...")
-    socket.on("message",(msg)=>{
-        socket.broadcast.emit("message",msg)
-    })
-})
+const io = require("socket.io")(http);
+
+io.on("connection", (socket) => {
+  console.log(`User connected with socket ID ${socket.id}`);
+
+  socket.on("message", (msg) => {
+    
+    socket.broadcast.emit("message", msg);
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`User with socket ID ${socket.id} disconnected`);
+  });
+});
+
+ 
+app.post("/broadcast", (req, res) => {
+  const message = "This is a hardcoded message"; 
+  
+  io.emit("message", message); 
+  res.send({ status: "message broadcasted to all users", message });
+});
+
+
+app.post("/send/:id", (req, res) => {
+  const socketId = req.params.id;
+  const message = "This is to a specific client"; 
+
+  const socket = io.sockets.sockets.get(socketId); 
+
+  if (socket) {
+    socket.emit("message", message); 
+    res.send({ status: `Message sent to user with ID ${socketId}`, message });
+  } else {
+    res.status(404).send({ status: "Socket ID not found" });
+  }
+});
